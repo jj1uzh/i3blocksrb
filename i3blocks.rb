@@ -4,7 +4,7 @@ require "json"
 
 $blocks = []
 def $blocks.publish
-  print self.join(', '), "],\n["
+  print '[', self.join(', '), "],\n"
   STDOUT.flush
 end
 
@@ -89,11 +89,14 @@ class BlockConf
   end
 end
 
-def block(name, &body)
-  conf = BlockConf.new(name)
-  conf.instance_eval &body
-  b = Block.new(name, conf)
-  $blocks.push b
+ConfLoader = Class.new(BasicObject) do
+  def method_missing(name, *args, &body)
+    Kernel.warn "#{name}: args are ignored" unless args.empty?
+    conf = BlockConf.new(name)
+    conf.instance_eval &body
+    b = Block.new(name, conf)
+    $blocks.push b
+  end
 end
 
 ## main
@@ -101,8 +104,8 @@ begin
   conf_path, = ARGV
   conf_path ||= '~/.config/i3blocksrb/config.rb'
   puts JSON.generate ({version: 1, click_events: true})
-  puts '[['
-  eval open(File.expand_path conf_path, &:read).read
+  puts '['
+  ConfLoader.new.instance_eval open(File.expand_path conf_path, &:read).read
   $blocks.publish
   sleep
 rescue SignalException
