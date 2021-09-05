@@ -16,10 +16,10 @@ class Block
     @transformer ||= proc(&:chomp)
     unless @command.nil?
       case interval
-          in 'once' | :once | nil ; exec_once
-          in 'persist' | :persist ; set_persist
-          in Integer => n         ; set_interval_by_secs(n)
-          in Object => other      ; raise "Unknown interval `#{other}` of block `#{name}`"
+      in 'once' | :once | nil ; exec_once
+      in 'persist' | :persist ; set_persist
+      in Integer => n         ; set_interval_by_secs(n)
+      in Object => other      ; raise "Unknown interval `#{other}` of block `#{name}`"
       end
     end
     regen_json
@@ -31,8 +31,11 @@ class Block
     @buf = JSON.generate @block_obj
   end
 
-  def update_text(text)
-    @block_obj[:full_text] = @transformer[text]
+  def update_text(command_result)
+    case @transformer[command_result]
+    in String => s ; @block_obj[:full_text] = s
+    in Hash => h   ; @block_obj.merge! h
+    end
     regen_json
     $blocks.publish
   end
@@ -73,20 +76,18 @@ class BlockConf
     @interval = intv
   end
 
-  def text(t)
-    full_text(t)
-  end
+  valid_props = ['full_text', 'short_text', 'color', 'background', 'border', 'border_top',
+                 'border_right', 'border_left', 'border_bottom', 'min_width', 'align',
+                 'urgent', 'separator', 'separator_block_width', 'markup']
 
-  def method_missing(prop, *args)
-    value, = args
-    if value.nil? then raise "block `#{@name}`: `#{prop}` needs one arg" end
-    @props ||= {}
-    @props[prop] = value.to_s
-  end
-
-  def respond_to_missing?(sym, include_private)
-    true
-  end
+  valid_props.each {|prop|
+    define_method prop do |*args|
+      value, = args
+      unless args.size == 1 then warn "block `#{@name}`: `#{name}` needs just one arg" end
+      @props ||= {}
+      @props[prop] = value
+    end
+  }
 end
 
 ConfLoader = Class.new(BasicObject) do
