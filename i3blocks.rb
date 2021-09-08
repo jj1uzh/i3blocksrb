@@ -76,9 +76,9 @@ class BlockConf
     @interval = intv
   end
 
-  valid_props = ['full_text', 'short_text', 'color', 'background', 'border', 'border_top',
-                 'border_right', 'border_left', 'border_bottom', 'min_width', 'align',
-                 'urgent', 'separator', 'separator_block_width', 'markup']
+  valid_props = %w(full_text short_text color background border border_top border_right
+                   border_left border_bottom min_width align urgent separator
+                   separator_block_width markup)
 
   valid_props.each {|prop|
     define_method prop do |*args|

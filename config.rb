@@ -1,27 +1,30 @@
-# coding: utf-8
-mem { #memとswapまとめたい
-  command 'free' do |out|
-    total, used = out.lines[1].split[1, 2].map(&:to_f)
-    percent = used / total * 100
-    color = if percent >= 80 then '#ff0000' else '#ffffff' end
-    {full_text: sprintf('Mem:%2.1fGi(%2.0f%%)', used / 1048576, percent), color: color}
-  end
-  interval 10
+xtitle {
+  command 'xtitle -s'
+  interval :persist
 }
 
-swap {
+mem {
   command 'free' do |out|
-    total, used = out.lines[2].split[1, 2].map(&:to_f)
-    percent = used / total * 100
-    color = if percent == 0 then '#ffffff' else '#ffff00' end
-    {full_text: sprintf('Swp:%2.1fGi(%2.0f%%)', used / 1048576, percent), color: color}
+    mem, swap = out.lines[1, 2].map {|line|
+      kind, total, used = line.split
+      used_f = used.to_f
+      total_f = total.to_f
+      percent = if total_f > 0 then used_f / total_f * 100 else 0 end
+      [kind, used_f, total_f, percent]
+    }
+    mem_color = if mem[3] < 80 then 'white' else 'red' end
+    swap_color = if swap[2] == 0 || swap[3] == 0 then 'white' elsif swap[3] > 70 then 'red' else 'yellow' end
+    mem << mem_color
+    swap << swap_color
+    [mem, swap].map {|kind, used, total, percent, color|
+      sprintf '<span foreground="%s">%s%2.1fGi(%.0f%%)</span>', color, kind, used / 1048576, percent
+    }.join(' ')
   end
+  markup 'pango'
   interval 10
 }
 
 clock {
   command "date '+%Y-%m-%d(%a) %H:%M'"
   interval 10
-  color '#000000'
-  background '#ffffff'
 }
