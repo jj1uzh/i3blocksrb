@@ -1,6 +1,6 @@
 #!/bin/ruby
 
-require "json"
+require 'json'
 
 $blocks = []
 def $blocks.publish
@@ -46,7 +46,10 @@ class Block
 
   def set_interval_by_secs(secs)
     Thread.new do
-      loop { update_text `#{@command}`; sleep secs }
+      loop {
+        update_text `#{@command}`
+        sleep secs
+      }
     end
   end
 
@@ -90,7 +93,7 @@ class BlockConf
   }
 end
 
-ConfLoader = Class.new(BasicObject) do
+ConfLoader = Class.new do
   def method_missing(name, *args, &body)
     Kernel.warn "#{name}: args are ignored" unless args.empty?
     conf = BlockConf.new(name)

@@ -1,7 +1,7 @@
-xtitle {
-  command 'xtitle -s'
-  interval :persist
-}
+# xtitle {
+#   command 'xtitle -s'
+#   interval :persist
+# }
 
 mem {
   command 'free' do |out|
