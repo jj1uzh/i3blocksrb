@@ -2,12 +2,35 @@
 
 require 'json'
 
-$blocks = []
+class Blocks
+  def initialize
+    @blocks_stack = []
+    @blocks = []
+  end
 
-def $blocks.publish
-  print '[', self.join(', '), "],\n"
-  STDOUT.flush
+  def publish()
+    print '[', @blocks.join(', '), "],\n"
+    STDOUT.flush
+  end
+
+  def push_blocks(blocks)
+    @blocks_stack.push(@blocks.clone)
+    @blocks = blocks
+    publish
+  end
+
+  def pop_blocks()
+    @blocks = @blocks_stack.pop()
+    publish
+  end
+
+  def click_event(click_obj)
+    @blocks
+      .find {|b| b.instance.to_s == click_obj['instance']}
+      &.on_click(click_obj)
+  end
 end
+$blocks = Blocks.new
 
 class Block
   def initialize(instance, conf)
@@ -41,10 +64,11 @@ class Block
     in Hash => h then @block_obj.merge! h
     end
     regen_json
-    $blocks.publish
+    $blocks.publish()
   end
 
   def update_by_command
+    warn "#{@instance} #{@transformer}"
     update @transformer[`#{@command}`]
   end
 
@@ -60,7 +84,8 @@ class Block
         update_by_command
         sleep secs
       }
-    rescue
+    rescue => e
+      warn e.full_message
       update 'ERROR'
     end
   end
@@ -72,17 +97,29 @@ class Block
       r.each chomp:true do |out|
         update @transformer[out]
       end
-    rescue
+    rescue => e
+      warn e.full_message
       update 'ERROR'
     ensure
       Process.kill :TERM, pid
     end
   end
 
+  def push_submenu(blocks)
+    warn blocks
+    $blocks.push_blocks(blocks)
+  end
+
+  def pop_submenu
+    $block.pop_blocks()
+  end
+
   def set_onclick(onclick)
     fn = case onclick
+         in '__back__'    then proc {|obj| pop_submenu}
          in String => cmd then proc {|obj| spawn cmd}
          in Proc => p     then proc {|obj| update p[obj]}
+         in Array => a    then proc {|obj| push_submenu a}
          in nil           then proc {}
          end
     define_singleton_method 'on_click', &fn
@@ -108,6 +145,17 @@ class BlockConf
     @onclick = if obj.nil? then block else obj end
   end
 
+  def submenu(&block)
+    if block.nil? then raise "#{@name}: submenu block is missing" end
+    loader = ConfLoader.new
+    loader.instance_eval(&block)
+    back_block_conf = BlockConf.new('back')
+    back_block_conf.full_text('BACK') # tmp
+    back_block_conf.onclick('__back__')
+    back_block = Block.new('back', back_block_conf)
+    @onclick = loader.loaded_blocks + [back_block]
+  end
+
   valid_props = %w(full_text short_text color background border border_top border_right
                    border_left border_bottom min_width align urgent separator
                    separator_block_width markup)
@@ -122,13 +170,18 @@ class BlockConf
   }
 end
 
-ConfLoader = Class.new do
+class ConfLoader
+  attr_reader :loaded_blocks
+  def initialize
+    @loaded_blocks = []
+  end
+
   def method_missing(name, *args, &body)
     Kernel.warn "#{name}: args are ignored" unless args.empty?
     conf = BlockConf.new(name)
     conf.instance_eval &body
     b = Block.new(name, conf)
-    $blocks.push b
+    @loaded_blocks.push b
   end
 end
 
@@ -154,9 +207,7 @@ def click_events_loop
   if (i = STDIN.readchar) != '[' then raise "Invalid input: #{i}" end
   click_events.each do |obj|
     next if obj['instance'].nil?
-    $blocks
-      .find {|b| b.instance.to_s == obj['instance']}
-      &.on_click(obj)
+    $blocks.click_event(obj)
   end
 end
 
@@ -166,8 +217,9 @@ begin
   conf_path ||= '~/.config/i3blocksrb/config.rb'
   puts JSON.generate ({version: 1, click_events: true})
   puts '['
-  ConfLoader.new.instance_eval open(File.expand_path conf_path, &:read).read
-  $blocks.publish
+  loader = ConfLoader.new
+  loader.instance_eval open(File.expand_path conf_path, &:read).read
+  $blocks.push_blocks(loader.loaded_blocks)
   click_events_loop
 rescue SignalException
 rescue => e
