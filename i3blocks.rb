@@ -40,6 +40,7 @@ class BlockGroups
     print(@current_group.to_j)
     puts(',')
     STDOUT.flush
+    warn(@current_group.to_j)
   end
 end
 
@@ -152,7 +153,7 @@ class Block
   def set_onclick(onclick)
     procs = onclick&.map {|pair|
       case pair
-      in [:do_cmd, cmd]       then proc {|obj| spawn cmd}
+      in [:do_cmd, cmd]       then proc {|obj| spawn(cmd, :out => '/dev/null')}
 #      in ['do_proc', p]       then proc {|obj| update p[obj]}
       in [:switch_group, key] then proc {|obj| @parent_group.switch_group(key)}
       in _                    then raise "Unexpected onclick value #{pair}"
